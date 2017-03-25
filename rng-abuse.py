@@ -3,6 +3,7 @@
 from ast import literal_eval as l_eval
 from tinymt import TinyMT
 from pokemons import Parent, Child, Egg
+import sys
 
 # Natures in game order
 natures = ["HARDY", "LONELY", "BRAVE", "ADAMANT", "NAUGHTY", "BOLD", "DOCILE",
@@ -312,7 +313,62 @@ def makeEgg(tinymt, parentA, parentB, ratio, charm, masuda, ballcheck, tsv,
                shiny, hpower)
 
 
+def parse_argv(argv):
+    def get_item(item):
+        data = {
+            'N': 'NONE',
+            'E': 'EVERSTONE',
+            'D': 'DESTINYKNOT'
+        }
+        return data.get(item)
+
+    def get_hex(hexs):
+        return [int(h,16) for h in hexs]
+
+    def get_esv(esvs):
+        return [int(e) for e in esvs]
+
+    data = {
+        'MALE': {
+            'ITEM': get_item(argv[0]),
+            'ABILITY': argv[1],
+            'IS_DITTO': argv[2]
+        },
+        'FEMALE': {
+            'ITEM': get_item(argv[3]),
+            'ABILITY': argv[4],
+            'IS_DITTO': argv[5]
+        },
+        'CHILD': {
+            'ABILITY': argv[6],
+            'GENDER': argv[7]
+        },
+        'RNG': {
+            'STATUS': get_hex(argv[8:12]),
+            'TSV': int(argv[12]),
+            'GENDER_RATIO': argv[13],
+            'ESV': get_esv(argv[14:])
+        }
+    }
+    return data
+
+def merge(params, data):
+    params['parents']['MALE'].item = data['MALE']['ITEM']
+    params['parents']['FEMALE'].item = data['FEMALE']['ITEM']
+    params['parents']['MALE'].ability = data['MALE']['ABILITY']
+    params['parents']['FEMALE'].ability = data['FEMALE']['ABILITY']
+    params['parents']['MALE'].ditto = True if data['MALE']['IS_DITTO'] == 'Y' else False
+    params['parents']['FEMALE'].ditto = True if data['FEMALE']['IS_DITTO'] == 'Y' else False
+    params['child'].ability = data['CHILD']['ABILITY']
+    params['child'].gender = data['CHILD']['GENDER']
+    params['seed'] = data['RNG']['STATUS']
+    params['tsv'] = data['RNG']['TSV']
+    params['esvs'] = data['RNG']['ESV']
+    params['ratio'] = ratios[data['RNG']['GENDER_RATIO']]
+    return params
+
 def main():
+    data = parse_argv(sys.argv[1:])
     # Read parameters, check for errors
     try:
         params, msg = readConfigFile()
@@ -323,6 +379,8 @@ def main():
             res.write("There was an error processing your config file:\n")
             res.write("ERROR: {}\n".format(msg))
         return
+
+    params = merge(params, data)
 
     results = []
     rolls = []
@@ -344,9 +402,9 @@ def main():
         tmt.nextState()
         tries += 1
         if not tries % 20000:
-            print "WARNING: Script is taking too long to finish."
-            print "         {} seeds were already searched.".format(tries)
-            print "         Press CTRL+C to terminate the script.\n"
+            print("WARNING: Script is taking too long to finish.")
+            print("         {} seeds were already searched.".format(tries))
+            print("         Press CTRL+C to terminate the script.\n")
 
     print("Found {} results, writing them to results.txt".format(len(results)))
     with open("results.txt", 'w') as res:
